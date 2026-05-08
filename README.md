@@ -1,6 +1,6 @@
 # Tek Whisperer
 
-Tek Whisperer is an unobtrusive Python tray utility that bridges speech and code. It records a voice command from a global hotkey, transcribes it locally with Faster-Whisper, asks OpenAI for a paste-ready coding response, speaks the explanation with AI-generated TTS, and injects the generated code into Codex, VS Code, Cursor, or another allowlisted IDE window.
+Tek Whisperer is an unobtrusive Python tray utility that bridges speech and code. It records a voice command from a global hotkey, transcribes it locally with Faster-Whisper, asks Anthropic Claude (Sonnet 4.6 by default) for a paste-ready coding response, speaks the explanation with AI-generated TTS, and injects the generated code into Codex, VS Code, Cursor, or another allowlisted IDE window.
 
 It is designed to be visible and consent-based: the tray icon shows when it is running, the hotkey explicitly starts and stops listening, and paste injection is guarded by an active-window allowlist.
 
@@ -8,7 +8,7 @@ It is designed to be visible and consent-based: the tray icon shows when it is r
 
 - Lives in the system tray with pause, record, config-folder, and quit controls.
 - Uses Faster-Whisper for local microphone transcription.
-- Uses OpenAI for coding responses through the Responses API.
+- Uses Anthropic Claude (Sonnet 4.6 by default) for coding responses through the Messages API, with structured-output enforcement so replies are always valid JSON.
 - Uses OpenAI `gpt-4o-mini-tts` by default for spoken explanations, with a system voice fallback.
 - Copies or pastes generated code into the active IDE window.
 - Refuses to paste into non-allowlisted windows by default and copies to the clipboard instead.
@@ -22,11 +22,14 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-Set your OpenAI API key:
+Set both API keys (Anthropic for the coding brain, OpenAI for TTS):
 
 ```powershell
-$env:OPENAI_API_KEY = "sk-..."
+setx ANTHROPIC_API_KEY "sk-ant-..."
+setx OPENAI_API_KEY    "sk-..."
 ```
+
+Close and reopen PowerShell so the variables are visible to subsequent shells. If you'd rather not pay for OpenAI TTS, set `[tts] enabled = false` in your config and Tek Whisperer falls back to the system voice via `pyttsx3`.
 
 Create a user config:
 
@@ -64,9 +67,10 @@ tek-whisperer --config .\config.example.toml
 Important settings:
 
 ```toml
-[openai]
-model = "gpt-5.5"
-reasoning_effort = "medium"
+[anthropic]
+model = "claude-sonnet-4-6"
+thinking_enabled = false   # flip on for hard problems; adds 1-3s latency
+effort = "medium"          # only used when thinking_enabled = true
 
 [tts]
 provider = "openai"
@@ -105,6 +109,7 @@ Add `--inject` to use the configured injection mode, or `--speak` to hear the ex
 
 ## Sources
 
-- OpenAI model selection docs: https://developers.openai.com/api/docs/models
+- Anthropic Messages API reference: https://platform.claude.com/docs/en/api/messages
+- Anthropic structured outputs: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+- Anthropic model selection: https://platform.claude.com/docs/en/about-claude/models/overview
 - OpenAI text-to-speech docs: https://developers.openai.com/api/docs/guides/text-to-speech
-- OpenAI transcription API reference: https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create

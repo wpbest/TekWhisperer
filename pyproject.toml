@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "William Best" }]
 dependencies = [
+    "anthropic>=0.50.0",
     "faster-whisper>=1.1.1",
     "numpy>=1.26",
     "openai>=1.99.0",

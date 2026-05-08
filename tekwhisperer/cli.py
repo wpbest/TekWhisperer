@@ -4,7 +4,7 @@ import argparse
 import logging
 import sys
 
-from .brain import OpenAICodeBridge
+from .brain import AnthropicCodeBridge
 from .config import default_config_toml, load_config, write_default_config
 from .injector import CodeInjector
 from .tts import SpeechEngine
@@ -18,7 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--print-config", action="store_true", help="Print the default config TOML.")
     parser.add_argument(
         "--command",
-        help="Send a typed command through OpenAI once instead of starting the tray app.",
+        help="Send a typed command through Anthropic once instead of starting the tray app.",
     )
     parser.add_argument(
         "--inject",
@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if args.command:
-        response = OpenAICodeBridge(config.openai).generate(args.command)
+        response = AnthropicCodeBridge(config.anthropic).generate(args.command)
         print(response.spoken)
         if response.code:
             print("\n--- code ---")

@@ -8,12 +8,12 @@ from typing import Any
 
 DEFAULT_SYSTEM_PROMPT = """You are Tek Whisperer, a concise hands-free coding copilot.
 
-The user speaks coding commands that should become useful IDE text. Return a JSON object with:
+The user speaks coding commands that should become useful IDE text. You produce two outputs:
 - "spoken": one to three short sentences explaining what you produced or what the user should know.
 - "code": raw code or editor text to inject. Use an empty string when no insertion is useful.
 
 Rules:
-- Do not wrap code in Markdown fences unless the user explicitly asks for Markdown.
+- Do not wrap code in Markdown fences.
 - Prefer complete, paste-ready snippets over vague advice.
 - If the user asks a question rather than requesting code, put the answer in "spoken" and leave "code" empty.
 - If a request is ambiguous, make a conservative assumption and mention it in "spoken".
@@ -50,10 +50,19 @@ class WhisperConfig:
 
 
 @dataclass
-class OpenAIConfig:
-    model: str = "gpt-5.5"
-    reasoning_effort: str = "medium"
+class AnthropicConfig:
+    """Configuration for the Claude-backed coding brain.
+
+    `thinking_enabled` defaults to False because voice flows are
+    latency-sensitive. Flip it on for harder coding tasks where you'd
+    rather pay 1-3s of extra latency for better reasoning. `effort`
+    only takes effect when thinking is enabled.
+    """
+
+    model: str = "claude-sonnet-4-6"
     max_output_tokens: int = 4096
+    thinking_enabled: bool = False
+    effort: str = "medium"  # low | medium | high — only used when thinking_enabled
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
 
 
@@ -93,7 +102,7 @@ class AppConfig:
     log_level: str = "INFO"
     recording: RecordingConfig = field(default_factory=RecordingConfig)
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
-    openai: OpenAIConfig = field(default_factory=OpenAIConfig)
+    anthropic: AnthropicConfig = field(default_factory=AnthropicConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     injection: InjectionConfig = field(default_factory=InjectionConfig)
     hotkeys: HotkeysConfig = field(default_factory=HotkeysConfig)
@@ -111,7 +120,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AppConfig:
     app_data = data.get("app", {})
     _apply_values(config, app_data)
 
-    for section_name in ("recording", "whisper", "openai", "tts", "injection", "hotkeys"):
+    for section_name in ("recording", "whisper", "anthropic", "tts", "injection", "hotkeys"):
         section_data = data.get(section_name, {})
         if section_data:
             _apply_values(getattr(config, section_name), section_data)
@@ -160,10 +169,13 @@ language = "en"
 beam_size = 5
 vad_filter = true
 
-[openai]
-model = "gpt-5.5"
-reasoning_effort = "medium"
+[anthropic]
+model = "claude-sonnet-4-6"
 max_output_tokens = 4096
+# Adaptive thinking is opt-in. Default off keeps voice latency low.
+thinking_enabled = false
+# Only used when thinking_enabled = true. low | medium | high.
+effort = "medium"
 system_prompt = """{prompt}"""
 
 [tts]

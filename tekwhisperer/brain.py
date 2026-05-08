@@ -5,9 +5,26 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from .config import OpenAIConfig
+from .config import AnthropicConfig
 
 LOGGER = logging.getLogger(__name__)
+
+
+_REPLY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "spoken": {
+            "type": "string",
+            "description": "One to three short sentences explaining what was produced.",
+        },
+        "code": {
+            "type": "string",
+            "description": "Raw code to inject; empty string when no insertion is useful.",
+        },
+    },
+    "required": ["spoken", "code"],
+    "additionalProperties": False,
+}
 
 
 @dataclass(frozen=True)
@@ -17,71 +34,66 @@ class CodeResponse:
     raw_text: str
 
 
-class OpenAICodeBridge:
-    def __init__(self, config: OpenAIConfig):
+class AnthropicCodeBridge:
+    """Bridge from a transcribed voice command to a structured {spoken, code} reply.
+
+    Uses Claude via the Anthropic Messages API with `output_config.format` as a
+    JSON schema, which guarantees the response parses cleanly without the
+    fragile fence-stripping the previous OpenAI Responses path needed.
+    """
+
+    def __init__(self, config: AnthropicConfig):
         self.config = config
         self._client = None
 
     def generate(self, command: str) -> CodeResponse:
         client = self._load_client()
+
+        output_config: dict[str, Any] = {
+            "format": {"type": "json_schema", "schema": _REPLY_SCHEMA},
+        }
         request: dict[str, Any] = {
             "model": self.config.model,
-            "input": [
-                {"role": "system", "content": self.config.system_prompt},
-                {"role": "user", "content": f"Voice command:\n{command.strip()}"},
+            "max_tokens": self.config.max_output_tokens,
+            "system": self.config.system_prompt,
+            "messages": [
+                {"role": "user", "content": f"Voice command:\n{command.strip()}"}
             ],
-            "max_output_tokens": self.config.max_output_tokens,
+            "output_config": output_config,
         }
-        if self.config.reasoning_effort and self.config.reasoning_effort.lower() != "none":
-            request["reasoning"] = {"effort": self.config.reasoning_effort}
 
-        LOGGER.info("Sending voice command to OpenAI model=%s", self.config.model)
-        response = client.responses.create(**request)
-        text = _response_to_text(response)
-        parsed = _parse_response(text)
-        return CodeResponse(spoken=parsed["spoken"], code=parsed["code"], raw_text=text)
+        # Adaptive thinking is opt-in: voice flows are latency-sensitive, so
+        # the default skips thinking entirely and emits the answer directly.
+        # Flip `thinking_enabled` in config for hard problems where you'd
+        # rather pay 1-3s of latency for better reasoning.
+        if self.config.thinking_enabled:
+            request["thinking"] = {"type": "adaptive"}
+            if self.config.effort:
+                output_config["effort"] = self.config.effort
+
+        LOGGER.info("Sending voice command to Anthropic model=%s", self.config.model)
+        response = client.messages.create(**request)
+
+        # The schema-constrained output is always a single text block;
+        # any thinking blocks (when enabled) come before it and we skip them.
+        text = next((b.text for b in response.content if b.type == "text"), "")
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            # output_config.format makes this practically impossible, but
+            # degrade gracefully if the SDK ever returns malformed JSON.
+            LOGGER.warning("Anthropic reply was not parseable JSON; treating as spoken")
+            return CodeResponse(spoken=text, code="", raw_text=text)
+
+        return CodeResponse(
+            spoken=str(payload.get("spoken", "")).strip(),
+            code=str(payload.get("code", "")).strip(),
+            raw_text=text,
+        )
 
     def _load_client(self):
         if self._client is None:
-            from openai import OpenAI
+            import anthropic
 
-            self._client = OpenAI()
+            self._client = anthropic.Anthropic()
         return self._client
-
-
-def _response_to_text(response: Any) -> str:
-    output_text = getattr(response, "output_text", None)
-    if output_text:
-        return str(output_text)
-
-    chunks: list[str] = []
-    for item in getattr(response, "output", []) or []:
-        for content in getattr(item, "content", []) or []:
-            text = getattr(content, "text", None)
-            if text:
-                chunks.append(str(text))
-    return "\n".join(chunks).strip()
-
-
-def _parse_response(text: str) -> dict[str, str]:
-    candidate = _strip_code_fence(text.strip())
-    try:
-        payload = json.loads(candidate)
-    except json.JSONDecodeError:
-        LOGGER.warning("OpenAI response was not JSON; treating it as spoken text")
-        return {"spoken": candidate, "code": ""}
-
-    return {
-        "spoken": str(payload.get("spoken", "")).strip(),
-        "code": str(payload.get("code", "")).strip(),
-    }
-
-
-def _strip_code_fence(text: str) -> str:
-    if not text.startswith("```"):
-        return text
-
-    lines = text.splitlines()
-    if len(lines) >= 3 and lines[-1].strip() == "```":
-        return "\n".join(lines[1:-1]).strip()
-    return text

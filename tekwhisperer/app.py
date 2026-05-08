@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .audio import AudioRecorder
-from .brain import OpenAICodeBridge
+from .brain import AnthropicCodeBridge
 from .config import AppConfig
 from .hotkeys import start_global_hotkey
 from .injector import CodeInjector
@@ -35,7 +35,7 @@ class TekWhispererApp:
 
         self.recorder = AudioRecorder(config.recording)
         self.transcriber = FasterWhisperTranscriber(config.whisper)
-        self.bridge = OpenAICodeBridge(config.openai)
+        self.bridge = AnthropicCodeBridge(config.anthropic)
         self.injector = CodeInjector(config.injection)
         self.speech = SpeechEngine(config.tts)
 

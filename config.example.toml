@@ -26,11 +26,17 @@ language = "en"
 beam_size = 5
 vad_filter = true
 
-[openai]
-# OpenAI docs currently recommend gpt-5.5 when you want the strongest coding model.
-model = "gpt-5.5"
-reasoning_effort = "medium"
+[anthropic]
+# Claude Sonnet 4.6 is the default for the coding brain. Switch to
+# claude-opus-4-7 for the most capable model (more expensive, slower)
+# or claude-haiku-4-5 for the cheapest/fastest (less smart at long code).
+model = "claude-sonnet-4-6"
 max_output_tokens = 4096
+# Adaptive thinking is opt-in. Default off keeps voice latency low; flip on
+# when you want better reasoning at the cost of 1-3s of extra latency.
+thinking_enabled = false
+# Only applies when thinking_enabled = true. low | medium | high.
+effort = "medium"
 
 [tts]
 enabled = true
