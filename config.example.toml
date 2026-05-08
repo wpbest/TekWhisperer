@@ -1,0 +1,53 @@
+# Copy this file to %USERPROFILE%\.tekwhisperer\config.toml on Windows
+# or ~/.tekwhisperer/config.toml on macOS/Linux, then adjust as needed.
+
+[app]
+data_dir = "~/.tekwhisperer"
+log_level = "INFO"
+
+[hotkeys]
+# Pynput format. Ctrl+Alt+Space toggles listening on and off.
+toggle_recording = "<ctrl>+<alt>+<space>"
+
+[recording]
+sample_rate = 16000
+channels = 1
+max_seconds = 30.0
+min_seconds = 0.35
+block_seconds = 0.10
+# Set to a sounddevice input device name or numeric device id if auto-pick fails.
+device = ""
+
+[whisper]
+model = "small.en"
+device = "auto"
+compute_type = "auto"
+language = "en"
+beam_size = 5
+vad_filter = true
+
+[openai]
+# OpenAI docs currently recommend gpt-5.5 when you want the strongest coding model.
+model = "gpt-5.5"
+reasoning_effort = "medium"
+max_output_tokens = 4096
+
+[tts]
+enabled = true
+provider = "openai"
+# OpenAI docs currently describe gpt-4o-mini-tts as the newest/reliable TTS model.
+model = "gpt-4o-mini-tts"
+# OpenAI docs recommend marin or cedar for best quality.
+voice = "marin"
+instructions = "Speak clearly and calmly, like a senior pair programmer giving concise guidance."
+fallback_system_voice = true
+
+[injection]
+# off, clipboard, paste, or typewrite. Paste copies generated code then presses Ctrl+V.
+mode = "paste"
+require_allowed_window = true
+allowed_window_keywords = ["Codex", "Visual Studio Code", "VS Code", "Cursor"]
+paste_hotkey = "ctrl+v"
+paste_delay_seconds = 0.10
+restore_clipboard_after_paste = false
+typewrite_interval_seconds = 0.0
